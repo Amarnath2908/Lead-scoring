@@ -1,0 +1,50 @@
+{
+  "best_model": "AdaBoost",
+  "best_accuracy": 0.8175,
+  "best_f1": 0.7669,
+  "training_date": "2026-07-19T15:45:29.876709",
+  "all_models": [
+    {
+      "model_name": "LogisticRegression",
+      "accuracy": 0.7914,
+      "f1": 0.7169,
+      "min_score": 0,
+      "max_score": 100
+    },
+    {
+      "model_name": "DecisionTree",
+      "accuracy": 0.7921,
+      "f1": 0.738,
+      "min_score": 10,
+      "max_score": 82
+    },
+    {
+      "model_name": "RandomForest",
+      "accuracy": 0.8055,
+      "f1": 0.7494,
+      "min_score": 8,
+      "max_score": 91
+    },
+    {
+      "model_name": "GradientBoosting",
+      "accuracy": 0.8108,
+      "f1": 0.7571,
+      "min_score": 1,
+      "max_score": 99
+    },
+    {
+      "model_name": "AdaBoost",
+      "accuracy": 0.8175,
+      "f1": 0.7669,
+      "min_score": 1,
+      "max_score": 99
+    },
+    {
+      "model_name": "XGBoost",
+      "accuracy": 0.8088,
+      "f1": 0.7539,
+      "min_score": 7,
+      "max_score": 92
+    }
+  ]
+}
