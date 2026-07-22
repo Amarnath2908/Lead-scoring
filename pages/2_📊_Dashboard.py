@@ -40,7 +40,7 @@ if os.path.exists(config.DATA_PATH):
             import plotly.graph_objects as go
             fig = go.Figure(go.Pie(
                 labels=[labels.get(k, str(k)) for k in conv.index],
-                values=conv.values, hole=0.45 #(donut chart),
+                values=conv.values, hole=0.45,  # donut chart
                 marker=dict(colors=["#ef4444", "#10b981"]),
             ))
             fig.update_layout(title="Dataset Conversion Rate", height=350,
