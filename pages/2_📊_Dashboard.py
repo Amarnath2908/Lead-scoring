@@ -17,7 +17,7 @@ from utils.visualization import (
 st.set_page_config(page_title="Dashboard | LeadScore AI", page_icon="📊", layout="wide")
 st.markdown('<h1 class="gradient-text">📊 Dashboard</h1>', unsafe_allow_html=True)
 
-# ── KPI row from prediction history ──────────────────────────────────────────
+# ── KPI row from prediction history 
 stats = get_stats()
 c1, c2, c3, c4 = st.columns(4)
 c1.metric("Total Predictions", stats["total"])
@@ -26,8 +26,7 @@ c3.metric("Predicted Converts", stats["converts"])
 c4.metric("Predicted Conv Rate", f"{stats['conversion_rate']}%")
 
 st.markdown("---")
-
-# ── Dataset-level charts ──────────────────────────────────────────────────────
+# ── Dataset-level charts 
 st.markdown("### 📈 Dataset Overview")
 if os.path.exists(config.DATA_PATH):
     raw = pd.read_csv(config.DATA_PATH)
@@ -41,7 +40,7 @@ if os.path.exists(config.DATA_PATH):
             import plotly.graph_objects as go
             fig = go.Figure(go.Pie(
                 labels=[labels.get(k, str(k)) for k in conv.index],
-                values=conv.values, hole=0.45,
+                values=conv.values, hole=0.45 #(donut chart),
                 marker=dict(colors=["#ef4444", "#10b981"]),
             ))
             fig.update_layout(title="Dataset Conversion Rate", height=350,
@@ -60,7 +59,7 @@ if os.path.exists(config.DATA_PATH):
 else:
     st.info("Dataset not found — dataset charts will appear after placing `Lead Scoring.csv`.")
 
-# ── Prediction history charts ─────────────────────────────────────────────────
+# ── Prediction history charts 
 st.markdown("---")
 st.markdown("### 📊 Prediction History Charts")
 history = get_history(limit=1000)
@@ -79,3 +78,4 @@ else:
 
     fig_bar = plot_conversion_bar(history)
     st.plotly_chart(fig_bar, use_container_width=True)
+

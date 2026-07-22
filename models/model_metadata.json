@@ -2,7 +2,7 @@
   "best_model": "AdaBoost",
   "best_accuracy": 0.8175,
   "best_f1": 0.7669,
-  "training_date": "2026-07-19T15:45:29.876709",
+  "training_date": "2026-07-22T11:36:39.880142",
   "all_models": [
     {
       "model_name": "LogisticRegression",

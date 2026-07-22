@@ -12,7 +12,6 @@ import config
 st.set_page_config(page_title="Home | LeadScore AI", page_icon="🏠", layout="wide")
 st.markdown('<h1 class="gradient-text">🏠 Home</h1>', unsafe_allow_html=True)
 
-# ── What the app does ─────────────────────────────────────────────────────────
 st.markdown("""
 ### What is LeadScore AI?
 
@@ -23,7 +22,7 @@ This app uses machine learning to predict each lead's conversion probability and
 
 st.markdown("---")
 
-# ── Priority band legend ─────────────────────────────────────────────────────
+# ── Priority band legend 
 st.markdown("### 🏷️ Priority Bands")
 cols = st.columns(5)
 for col, (band, (lo, hi)) in zip(cols, config.SCORE_BANDS.items()):
@@ -41,7 +40,7 @@ for col, (band, (lo, hi)) in zip(cols, config.SCORE_BANDS.items()):
 
 st.markdown("---")
 
-# ── Dataset summary ───────────────────────────────────────────────────────────
+# ── Dataset summary 
 st.markdown("### 📦 Dataset Summary")
 if os.path.exists(config.DATA_PATH):
     df = pd.read_csv(config.DATA_PATH)
@@ -57,7 +56,7 @@ if os.path.exists(config.DATA_PATH):
     with st.expander("📋 Sample rows"):
         st.dataframe(df.head(10), use_container_width=True)
 
-    with st.expander("📋 Column dtypes"):
+    with st.expander("📋 Column dtypes"):       
         dtypes = df.dtypes.reset_index()
         dtypes.columns = ["Column", "Type"]
         dtypes["Type"] = dtypes["Type"].astype(str)

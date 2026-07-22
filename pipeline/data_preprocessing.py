@@ -16,9 +16,8 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import config
 
 
-# ---------------------------------------------------------------------------
+
 # Custom transformers
-# ---------------------------------------------------------------------------
 
 class SelectReplacer(BaseEstimator, TransformerMixin):
     """Replace the CRM placeholder 'Select' with NaN, and pad any
@@ -76,9 +75,8 @@ class FrequencyEncoder(BaseEstimator, TransformerMixin):
             return df.values.astype(float)
 
 
-# ---------------------------------------------------------------------------
+
 # Cleaning helpers
-# ---------------------------------------------------------------------------
 
 def load_and_clean(path=config.DATA_PATH):
     """Load raw CSV, drop leakage/ID cols, duplicates, 'Select'→NaN."""
@@ -129,7 +127,7 @@ def build_preprocessor(num_cols, low_cats, high_cats):
         transformers.append(("num", num_pipe, num_cols))
     if low_cats:
         transformers.append(("low", low_pipe, low_cats))
-    if high_cats:
+    if high_cats:   
         transformers.append(("high", high_pipe, high_cats))
     return ColumnTransformer(transformers=transformers, remainder="drop")
 

@@ -19,7 +19,7 @@ if history.empty:
     st.info("No predictions yet. Use **🎯 Predict Lead** to start scoring leads.")
     st.stop()
 
-# ── Stats row ─────────────────────────────────────────────────────────────────
+# ── Stats row 
 stats = get_stats()
 c1, c2, c3, c4 = st.columns(4)
 c1.metric("Total Predictions", stats["total"])
@@ -29,7 +29,7 @@ c4.metric("Predicted Conv Rate", f"{stats['conversion_rate']}%")
 
 st.markdown("---")
 
-# ── Filters ───────────────────────────────────────────────────────────────────
+# ── Filters 
 col1, col2 = st.columns(2)
 with col1:
     band_filter = st.multiselect(
@@ -50,7 +50,7 @@ filtered = history[
 
 st.markdown(f"**Showing {len(filtered)} of {len(history)} records**")
 
-# ── Data table ────────────────────────────────────────────────────────────────
+# ── Data table 
 display_cols = ["id", "timestamp", "prediction", "probability", "lead_score", "priority", "recommendation"]
 available = [c for c in display_cols if c in filtered.columns]
 st.dataframe(
@@ -60,7 +60,7 @@ st.dataframe(
     use_container_width=True, hide_index=True, height=400,
 )
 
-# ── Charts ────────────────────────────────────────────────────────────────────
+# ── Charts 
 st.markdown("---")
 col1, col2 = st.columns(2)
 with col1:
@@ -70,7 +70,7 @@ with col2:
     if "priority" in filtered.columns:
         st.plotly_chart(plot_priority_pie(filtered["priority"]), use_container_width=True)
 
-# ── Clear history ─────────────────────────────────────────────────────────────
+# ── Clear history 
 st.markdown("---")
 with st.expander("⚠️ Danger Zone"):
     if st.button("🗑️ Clear All History", type="secondary"):

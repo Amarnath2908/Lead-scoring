@@ -12,6 +12,24 @@ import config
 from utils.scoring import score_lead
 
 
+def _patch_imputers(obj):
+    """Recursively patch SimpleImputer instances to ensure cross-version compatibility (e.g. missing _fill_dtype)."""
+    if hasattr(obj, "named_steps"):
+        for step in obj.named_steps.values():
+            _patch_imputers(step)
+    elif hasattr(obj, "transformers_"):
+        for _, transformer, _ in obj.transformers_:
+            _patch_imputers(transformer)
+    elif hasattr(obj, "steps"):
+        for _, step in obj.steps:
+            _patch_imputers(step)
+    else:
+        if type(obj).__name__ == "SimpleImputer":
+            if not hasattr(obj, "_fill_dtype"):
+                stats = getattr(obj, "statistics_", None)
+                obj._fill_dtype = getattr(stats, "dtype", np.float64)
+
+
 def load_model():
     """Load the trained classifier."""
     if not os.path.exists(config.MODEL_PATH):
@@ -23,7 +41,9 @@ def load_preprocessor():
     """Load the fitted preprocessing pipeline."""
     if not os.path.exists(config.PREPROCESSOR_PATH):
         raise FileNotFoundError(f"Preprocessor not found at {config.PREPROCESSOR_PATH}. Run pipeline/train.py first.")
-    return joblib.load(config.PREPROCESSOR_PATH)
+    prep = joblib.load(config.PREPROCESSOR_PATH)
+    _patch_imputers(prep)
+    return prep
 
 
 def load_metadata():

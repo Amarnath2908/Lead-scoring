@@ -1,0 +1,1801 @@
+================================================================================
+LEADSCORE AI — COMPLETE LINE-BY-LINE FILE EXPLANATION DOCUMENTATION
+================================================================================
+
+This document provides a line-by-line explanation for every file and every line of code in the LeadScore AI Machine Learning project.
+
+--------------------------------------------------------------------------------
+FILE 1: config.py
+--------------------------------------------------------------------------------
+Line 1: """
+Line 2: config.py — Central configuration for LeadScore AI.
+Line 3: Every constant, path, and threshold lives here.
+Line 4: """
+  -> Lines 1-4: Docstring describing the purpose of config.py as the single source of truth for all paths, constants, and settings.
+
+Line 5: import os
+  -> Imports Python's built-in operating system module for managing directory and file paths across platforms (Windows/Linux).
+
+Line 6: 
+  -> Blank line separating imports from section headers.
+
+Line 7: # ---------------------------------------------------------------------------
+Line 8: # Paths
+Line 9: # ---------------------------------------------------------------------------
+  -> Lines 7-9: Section header for directory and file path configurations.
+
+Line 10: PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__))
+  -> Finds the absolute directory path where config.py resides, ensuring all relative paths resolve correctly regardless of working directory.
+
+Line 11: DATA_PATH = os.path.join(PROJECT_ROOT, "Lead Scoring.csv")
+  -> Constructs the full file path to the raw dataset CSV file.
+
+Line 12: MODELS_DIR = os.path.join(PROJECT_ROOT, "models")
+  -> Constructs the directory path where trained machine learning artifacts are stored.
+
+Line 13: MODEL_PATH = os.path.join(MODELS_DIR, "model.pkl")
+  -> File path for the serialized winning classifier model (model.pkl).
+
+Line 14: PREPROCESSOR_PATH = os.path.join(MODELS_DIR, "preprocessor.pkl")
+  -> File path for the serialized scikit-learn preprocessing pipeline (preprocessor.pkl).
+
+Line 15: METADATA_PATH = os.path.join(MODELS_DIR, "model_metadata.json")
+  -> File path for storing training metadata and performance benchmarks of all models.
+
+Line 16: DB_DIR = os.path.join(PROJECT_ROOT, "database")
+  -> Directory path for the SQLite database folder.
+
+Line 17: DB_PATH = os.path.join(DB_DIR, "predictions.db")
+  -> File path for the SQLite database predictions.db.
+
+Line 18: 
+Line 19: # ---------------------------------------------------------------------------
+Line 20: # Data cleaning
+Line 21: # ---------------------------------------------------------------------------
+  -> Lines 18-21: Section header for data cleaning thresholds and settings.
+
+Line 22: MISSING_THRESHOLD = 0.40          # drop columns with >40 % missing
+  -> Specifies that any dataset column with more than 40% missing values will be automatically dropped.
+
+Line 23: RANDOM_STATE = 42
+  -> Sets the fixed seed for random numbers to ensure reproducible train-test splits and model training across runs.
+
+Line 24: TEST_SIZE = 0.20
+  -> Allocates 20% of the dataset for held-out evaluation testing and 80% for training.
+
+Line 25: 
+Line 26: # Columns that leak future information (filled only after sales contact)
+Line 27: LEAKAGE_COLUMNS = [
+Line 28:     "Tags", "Lead Quality", "Last Notable Activity",
+Line 29:     "Asymmetrique Activity Score", "Asymmetrique Profile Score",
+Line 30:     "Asymmetrique Activity Index", "Asymmetrique Profile Index",
+Line 31: ]
+  -> Lines 26-31: List of 7 post-contact fields that must be dropped to prevent data leakage (information populated only after a lead has already been contacted).
+
+Line 32: 
+Line 33: # ID columns — no predictive value
+Line 34: ID_COLUMNS = ["Prospect ID", "Lead Number"]
+  -> Lines 33-34: Unique identifier columns that carry zero statistical signal and must be excluded from modeling.
+
+Line 35: 
+Line 36: # Numeric columns to IQR-cap
+Line 37: OUTLIER_COLUMNS = ["TotalVisits", "Page Views Per Visit"]
+  -> Lines 36-37: Continuous numerical features designated for Interquartile Range (IQR) outlier capping.
+
+Line 38: IQR_MULTIPLIER = 1.5
+  -> The standard multiplier used to set upper boundary limits for outlier clipping (Q3 + 1.5 * IQR).
+
+Line 39: 
+Line 40: # Cardinality threshold: <= this -> OneHot, > this -> frequency-encode
+Line 41: HIGH_CARDINALITY_THRESHOLD = 10
+  -> Categorical features with 10 or fewer unique categories use One-Hot Encoding; features with >10 categories use Frequency Encoding.
+
+Line 42: 
+Line 43: # ---------------------------------------------------------------------------
+Line 44: # Lead-score bands
+Line 45: # ---------------------------------------------------------------------------
+  -> Lines 43-45: Section header for business scoring bands and actions.
+
+Line 46: SCORE_BANDS = {
+Line 47:     "Very Hot":  (90, 100),
+Line 48:     "Hot":       (75, 89),
+Line 49:     "Warm":      (50, 74),
+Line 50:     "Cold":      (25, 49),
+Line 51:     "Very Cold": (0, 24),
+Line 52: }
+  -> Lines 46-52: Dictionary defining the lower and upper bounds for each of the 5 Lead Score priority bands.
+
+Line 53: 
+Line 54: BAND_ACTIONS = {
+Line 55:     "Very Hot":  "Call immediately",
+Line 56:     "Hot":       "Same-day call",
+Line 57:     "Warm":      "Follow-up email within 24 h",
+Line 58:     "Cold":      "Add to nurture campaign",
+Line 59:     "Very Cold": "Deprioritize",
+Line 60: }
+  -> Lines 54-60: Dictionary specifying the concrete recommended sales action for each priority band.
+
+Line 61: 
+Line 62: BAND_COLORS = {
+Line 63:     "Very Hot":  "#ef4444",
+Line 64:     "Hot":       "#f97316",
+Line 65:     "Warm":      "#eab308",
+Line 66:     "Cold":      "#3b82f6",
+Line 67:     "Very Cold": "#6366f1",
+Line 68: }
+  -> Lines 62-68: Dictionary mapping each priority band to its UI hex color code.
+
+Line 69: 
+Line 70: # Feature-engineering weights
+Line 71: ENGAGEMENT_VISIT_WEIGHT = 0.3
+Line 72: ENGAGEMENT_TIME_WEIGHT = 0.5
+Line 73: ENGAGEMENT_PV_WEIGHT = 0.2
+Line 74: 
+  -> Lines 70-74: Weights used to compute the synthetic `website_engagement_score` (30% visits, 50% time spent, 20% page views).
+
+
+--------------------------------------------------------------------------------
+FILE 2: app.py
+--------------------------------------------------------------------------------
+Line 1: """
+Line 2: app.py — Streamlit entry point for LeadScore AI.
+Line 3: """
+  -> Lines 1-3: Docstring declaring app.py as the main Streamlit web application file.
+
+Line 4: import os, sys
+  -> Imports os and sys modules for directory traversal and Python path configuration.
+
+Line 5: import streamlit as st
+  -> Imports Streamlit under alias `st` for rendering web pages, components, and layout elements.
+
+Line 6: 
+Line 7: sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+  -> Inserts the project root directory into Python's module search path so `config` and `utils` can be imported seamlessly.
+
+Line 8: import config
+  -> Imports the config module containing paths and constants.
+
+Line 9: from utils.database import init_db
+  -> Imports `init_db()` to set up the SQLite database schema on startup.
+
+Line 10: 
+Line 11: st.set_page_config(
+Line 12:     page_title="LeadScore AI",
+Line 13:     page_icon="🎯",
+Line 14:     layout="wide",
+Line 15:     initial_sidebar_state="expanded",
+Line 16: )
+  -> Lines 11-16: Configures the browser window title, favicon icon, wide screen layout, and expanded sidebar.
+
+Line 17: 
+Line 18: # Initialise DB on first load
+Line 19: init_db()
+  -> Calls `init_db()` on application launch to ensure `predictions.db` and the `predictions` table exist.
+
+Line 20: 
+Line 21: # ── Inject custom CSS ─────────────────────────────────────────────────────────
+Line 22: st.markdown("""
+Line 23: <style>
+Line 24: @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap');
+Line 25: * { font-family: 'Inter', sans-serif; }
+Line 26: [data-testid="stSidebar"] {
+Line 27:     background: linear-gradient(180deg, #0f0f1a 0%, #1a1a2e 100%);
+Line 28: }
+Line 29: .gradient-text {
+Line 30:     background: linear-gradient(135deg, #6366f1, #a855f7, #ec4899);
+Line 31:     -webkit-background-clip: text;
+Line 32:     -webkit-text-fill-color: transparent;
+Line 33:     font-weight: 800;
+Line 34: }
+Line 35: .kpi-card {
+Line 36:     background: rgba(255,255,255,0.04);
+Line 37:     border: 1px solid rgba(255,255,255,0.08);
+Line 38:     border-radius: 16px;
+Line 39:     padding: 1.25rem 1.5rem;
+Line 40:     text-align: center;
+Line 41:     backdrop-filter: blur(12px);
+Line 42: }
+Line 43: .kpi-label { font-size: 0.75rem; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.05em; }
+Line 44: .kpi-value { font-size: 2rem; font-weight: 800; color: #f1f5f9; margin-top: 0.25rem; }
+Line 45: .section-card {
+Line 46:     background: rgba(255,255,255,0.03);
+Line 47:     border: 1px solid rgba(255,255,255,0.06);
+Line 48:     border-radius: 16px;
+Line 49:     padding: 1.5rem;
+Line 50:     margin-bottom: 1rem;
+Line 51: }
+Line 52: .band-row {
+Line 53:     display: flex; justify-content: space-between; align-items: center;
+Line 54:     padding: 0.5rem 0.75rem; border-radius: 8px; margin: 0.25rem 0;
+Line 55: }
+Line 56: </style>
+Line 57: """, unsafe_allow_html=True)
+  -> Lines 21-57: Injects custom CSS styling for dark glassmorphism aesthetic, custom fonts, gradient text titles, sidebar styling, and card components.
+
+Line 58: 
+Line 59: # ── Landing content ───────────────────────────────────────────────────────────
+Line 60: st.markdown('<h1 class="gradient-text">🎯 LeadScore AI</h1>', unsafe_allow_html=True)
+  -> Renders the main landing page header styled with gradient color text.
+
+Line 61: st.markdown("**AI-Powered Lead Scoring & Conversion Prediction** for X Education")
+  -> Subtitle explaining the application purpose.
+
+Line 62: 
+Line 63: # Model status
+Line 64: model_ready = os.path.exists(config.MODEL_PATH)
+  -> Checks if the trained model file `models/model.pkl` exists on disk.
+
+Line 65: if model_ready:
+Line 66:     st.success("✅ Model loaded and ready — navigate to **Predict Lead** to start scoring.")
+Line 67: else:
+Line 68:     st.warning("⚠️ No trained model found. Run `python pipeline/train.py` to train.")
+  -> Lines 65-68: Displays a success banner if the trained model exists, or a warning prompting the user to run training.
+
+Line 69: 
+Line 70: st.markdown("---")
+  -> Horizontal divider line.
+
+Line 71: st.markdown("### How it works")
+Line 72: st.markdown("""
+Line 73: 1. **Enter lead details** on the Predict Lead page.
+Line 74: 2. The ML model predicts conversion probability.
+Line 75: 3. Probability is converted to a **Lead Score (0–100)**.
+Line 76: 4. Each lead is assigned a **Priority Band** with a **recommended action**.
+Line 77: """)
+  -> Lines 71-77: Renders a 4-step user guide explaining the lead scoring process.
+
+Line 78: 
+Line 79: st.markdown("### 🏷️ Priority Bands")
+  -> Section header for priority bands.
+
+Line 80: for band, (lo, hi) in config.SCORE_BANDS.items():
+Line 81:     color = config.BAND_COLORS[band]
+Line 82:     action = config.BAND_ACTIONS[band]
+Line 83:     st.markdown(
+Line 84:         f'<div class="band-row" style="border-left:4px solid {color};">'
+Line 85:         f'<span style="color:{color};font-weight:700;">{band}</span>'
+Line 86:         f'<span style="color:#94a3b8;font-size:0.85rem;">{lo}–{hi} → {action}</span></div>',
+Line 87:         unsafe_allow_html=True,
+Line 88:     )
+  -> Lines 80-88: Iterates over configured score bands and renders color-coded summary rows for each priority band and its sales recommendation.
+
+Line 89: 
+  -> Blank ending line.
+
+
+--------------------------------------------------------------------------------
+FILE 3: pipeline/data_preprocessing.py
+--------------------------------------------------------------------------------
+Line 1: """
+Line 2: pipeline/data_preprocessing.py
+Line 3: Load raw CSV, clean nulls, drop leakage/ID columns, fix dtypes.
+Line 4: Returns a reusable sklearn ColumnTransformer pipeline step.
+Line 5: """
+  -> Lines 1-5: Module docstring for raw data loading, data cleaning, and scikit-learn preprocessing pipeline construction.
+
+Line 6: import numpy as np
+Line 7: import pandas as pd
+Line 8: from sklearn.base import BaseEstimator, TransformerMixin
+Line 9: from sklearn.compose import ColumnTransformer
+Line 10: from sklearn.impute import SimpleImputer
+Line 11: from sklearn.pipeline import Pipeline
+Line 12: from sklearn.preprocessing import OneHotEncoder, StandardScaler
+  -> Lines 6-12: Imports numerical, data manipulation, and scikit-learn preprocessing utilities (imputers, encoders, scalers, pipelines).
+
+Line 13: 
+Line 14: import sys, os
+Line 15: sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+Line 16: import config
+  -> Lines 14-16: Ensures parent path is in Python path and imports `config`.
+
+Line 17: 
+Line 18: 
+Line 19: # ---------------------------------------------------------------------------
+Line 20: # Custom transformers
+Line 21: # ---------------------------------------------------------------------------
+  -> Lines 19-21: Section header for custom scikit-learn transformers.
+
+Line 22: 
+Line 23: class SelectReplacer(BaseEstimator, TransformerMixin):
+Line 24:     """Replace the CRM placeholder 'Select' with NaN, and pad any
+Line 25:     columns that were present during training but missing at inference."""
+  -> Lines 23-25: Custom transformer class definition that cleans 'Select' string placeholders and self-heals missing columns during inference.
+
+Line 26: 
+Line 27:     def fit(self, X, y=None):
+Line 28:         self.columns_ = list(X.columns)
+Line 29:         return self
+  -> Lines 27-29: `fit()` method records all column names present during training so it can detect missing columns at inference time.
+
+Line 30: 
+Line 31:     def transform(self, X):
+Line 32:         X = X.copy()
+Line 33:         # Pad missing columns
+Line 34:         for col in self.columns_:
+Line 35:             if col not in X.columns:
+Line 36:                 X[col] = np.nan
+Line 37:         X[X == "Select"] = np.nan
+Line 38:         return X
+  -> Lines 31-38: `transform()` creates a copy, pads missing expected columns with NaN, replaces 'Select' with `np.nan`, and returns the DataFrame.
+
+Line 39: 
+Line 40: 
+Line 41: class FrequencyEncoder(BaseEstimator, TransformerMixin):
+Line 42:     """Replace each category with its training-set frequency.
+Line 43:     Works with both DataFrames and numpy arrays (inside ColumnTransformer)."""
+  -> Lines 41-43: Custom transformer class definition for frequency encoding high-cardinality categorical variables.
+
+Line 44: 
+Line 45:     def __init__(self, columns=None):
+Line 46:         self.columns = columns or []
+Line 47:         self._freq_maps = {}
+Line 48:         self._pos_maps = {}
+  -> Lines 45-48: Constructor initializing column lists and frequency mapping dictionaries.
+
+Line 49: 
+Line 50:     def fit(self, X, y=None):
+Line 51:         if isinstance(X, pd.DataFrame):
+Line 52:             for col in self.columns:
+Line 53:                 if col in X.columns:
+Line 54:                     self._freq_maps[col] = X[col].value_counts(normalize=True).to_dict()
+Line 55:         else:
+Line 56:             df = pd.DataFrame(X)
+Line 57:             for i in range(df.shape[1]):
+Line 58:                 self._pos_maps[i] = df[i].value_counts(normalize=True).to_dict()
+Line 59:         return self
+  -> Lines 50-59: `fit()` calculates normalized category frequencies for specified columns (or array positions) on training data.
+
+Line 60: 
+Line 61:     def transform(self, X):
+Line 62:         if isinstance(X, pd.DataFrame):
+Line 63:             X = X.copy()
+Line 64:             for col, fm in self._freq_maps.items():
+Line 65:                 if col in X.columns:
+Line 66:                     X[col] = X[col].map(fm).fillna(0.0)
+Line 67:             return X
+Line 68:         else:
+Line 69:             df = pd.DataFrame(X)
+Line 70:             maps = self._pos_maps if self._pos_maps else {
+Line 71:                 i: self._freq_maps.get(c, {}) for i, c in enumerate(self.columns)
+72:             }
+Line 73:             for i, fm in maps.items():
+Line 74:                 if i < df.shape[1]:
+Line 75:                     df[i] = df[i].map(fm).fillna(0.0)
+Line 76:             return df.values.astype(float)
+  -> Lines 61-76: `transform()` maps categories to their stored training frequency values, filling unseen categories with 0.0, handling both DataFrame and numpy array inputs.
+
+Line 77: 
+Line 78: 
+Line 79: # ---------------------------------------------------------------------------
+Line 80: # Cleaning helpers
+Line 81: # ---------------------------------------------------------------------------
+  -> Lines 79-81: Section header for raw dataset cleaning helper functions.
+
+Line 82: 
+Line 83: def load_and_clean(path=config.DATA_PATH):
+Line 84:     """Load raw CSV, drop leakage/ID cols, duplicates, 'Select'->NaN."""
+  -> Function header for loading and cleaning the raw dataset.
+
+Line 85:     df = pd.read_csv(path)
+  -> Reads the raw CSV file into a pandas DataFrame.
+
+Line 86:     # Drop leakage
+Line 87:     leakage = [c for c in config.LEAKAGE_COLUMNS if c in df.columns]
+Line 88:     df.drop(columns=leakage, inplace=True)
+  -> Lines 86-88: Identifies and drops the 7 post-contact leakage columns.
+
+Line 89:     # Drop IDs
+Line 90:     ids = [c for c in config.ID_COLUMNS if c in df.columns]
+Line 91:     df.drop(columns=ids, inplace=True)
+  -> Lines 89-91: Identifies and drops non-predictive ID columns.
+
+Line 92:     # Duplicates
+Line 93:     df.drop_duplicates(inplace=True)
+  -> Removes exact duplicate rows.
+
+Line 94:     # 'Select' -> NaN
+Line 95:     df.replace("Select", np.nan, inplace=True)
+  -> Replaces 'Select' string placeholders with `np.nan`.
+
+Line 96:     # Drop high-missing columns
+Line 97:     missing = df.isnull().mean()
+Line 98:     drop_cols = missing[missing > config.MISSING_THRESHOLD].index.tolist()
+Line 99:     df.drop(columns=drop_cols, inplace=True)
+  -> Lines 96-99: Calculates missing value ratio per column and drops columns exceeding `MISSING_THRESHOLD` (40%).
+
+Line 100:     return df
+  -> Returns the cleaned pandas DataFrame.
+
+Line 101: 
+Line 102: 
+Line 103: def classify_columns(df, target="Converted"):
+Line 104:     """Split feature columns into numeric / low-card cat / high-card cat."""
+  -> Function header to split features into numerical, low-cardinality, and high-cardinality types.
+
+Line 105:     features = df.drop(columns=[target], errors="ignore")
+  -> Drops the target variable 'Converted'.
+
+Line 106:     num = features.select_dtypes(include=[np.number]).columns.tolist()
+  -> Selects all numerical column names.
+
+Line 107:     cats = features.select_dtypes(include=["object", "category"]).columns.tolist()
+  -> Selects all object/categorical column names.
+
+Line 108:     low = [c for c in cats if features[c].nunique() <= config.HIGH_CARDINALITY_THRESHOLD]
+  -> Filters categorical columns with <=10 unique values (for One-Hot Encoding).
+
+Line 109:     high = [c for c in cats if features[c].nunique() > config.HIGH_CARDINALITY_THRESHOLD]
+  -> Filters categorical columns with >10 unique values (for Frequency Encoding).
+
+Line 110:     return num, low, high
+  -> Returns the lists of numerical, low-cardinality, and high-cardinality column names.
+
+Line 111: 
+Line 112: 
+Line 113: def build_preprocessor(num_cols, low_cats, high_cats):
+Line 114:     """Build the ColumnTransformer with impute + encode + scale."""
+  -> Function header building the core `ColumnTransformer`.
+
+Line 115:     num_pipe = Pipeline([
+Line 116:         ("imputer", SimpleImputer(strategy="median")),
+Line 117:         ("scaler", StandardScaler()),
+Line 118:     ])
+  -> Lines 115-118: Builds pipeline for numerical features: median imputation followed by z-score standardization.
+
+Line 119:     low_pipe = Pipeline([
+Line 120:         ("imputer", SimpleImputer(strategy="most_frequent")),
+Line 121:         ("encoder", OneHotEncoder(handle_unknown="ignore", drop="first", sparse_output=False)),
+Line 122:     ])
+  -> Lines 119-122: Builds pipeline for low-cardinality categoricals: mode imputation followed by One-Hot Encoding (dropping first category).
+
+Line 123:     high_pipe = Pipeline([
+Line 124:         ("imputer", SimpleImputer(strategy="constant", fill_value="Unknown")),
+Line 125:         ("freq", FrequencyEncoder(columns=high_cats)),
+Line 126:     ])
+  -> Lines 123-126: Builds pipeline for high-cardinality categoricals: constant imputation ('Unknown') followed by Frequency Encoding.
+
+Line 127:     transformers = []
+Line 128:     if num_cols:
+Line 129:         transformers.append(("num", num_pipe, num_cols))
+Line 130:     if low_cats:
+Line 131:         transformers.append(("low", low_pipe, low_cats))
+Line 132:     if high_cats:
+Line 133:         transformers.append(("high", high_pipe, high_cats))
+  -> Lines 127-133: Appends existing column pipelines to the transformers list.
+
+Line 134:     return ColumnTransformer(transformers=transformers, remainder="drop")
+  -> Assembles and returns the `ColumnTransformer`.
+
+Line 135: 
+Line 136: 
+Line 137: def build_full_pipeline(num_cols, low_cats, high_cats):
+Line 138:     """SelectReplacer -> ColumnTransformer (single Pipeline object)."""
+  -> Function header constructing the outer preprocessing Pipeline.
+
+Line 139:     ct = build_preprocessor(num_cols, low_cats, high_cats)
+  -> Calls `build_preprocessor()`.
+
+Line 140:     return Pipeline([
+Line 141:         ("select_replacer", SelectReplacer()),
+Line 142:         ("column_transformer", ct),
+Line 143:     ])
+  -> Lines 140-143: Returns full preprocessing pipeline: SelectReplacer step followed by ColumnTransformer step.
+
+Line 144: 
+  -> Blank ending line.
+
+
+--------------------------------------------------------------------------------
+FILE 4: pipeline/feature_engineering.py
+--------------------------------------------------------------------------------
+Line 1: """
+Line 2: pipeline/feature_engineering.py
+Line 3: Create derived features from pre-contact data.
+Line 4: """
+  -> Lines 1-4: Module docstring for feature engineering.
+
+Line 5: import numpy as np
+Line 6: import pandas as pd
+Line 7: from sklearn.base import BaseEstimator, TransformerMixin
+  -> Imports numpy, pandas, and scikit-learn BaseEstimator/TransformerMixin.
+
+Line 8: 
+Line 9: import sys, os
+Line 10: sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+Line 11: import config
+  -> Lines 9-11: Configures import paths and imports config.
+
+Line 12: 
+Line 13: 
+Line 14: class FeatureEngineer(BaseEstimator, TransformerMixin):
+Line 15:     """Adds a website_engagement_score column (weighted combo of visit metrics)."""
+  -> Class definition for custom scikit-learn feature engineering transformer.
+
+Line 16: 
+Line 17:     def fit(self, X, y=None):
+Line 18:         return self
+  -> `fit()` method returns self (no state parameters learned).
+
+Line 19: 
+Line 20:     def transform(self, X):
+Line 21:         X = X.copy()
+  -> Creates a copy of input DataFrame X.
+
+Line 22: 
+Line 23:         # Engagement score = weighted sum of normalised visit metrics
+Line 24:         cols = {
+Line 25:             "TotalVisits":                  config.ENGAGEMENT_VISIT_WEIGHT,
+Line 26:             "Total Time Spent on Website":  config.ENGAGEMENT_TIME_WEIGHT,
+Line 27:             "Page Views Per Visit":         config.ENGAGEMENT_PV_WEIGHT,
+Line 28:         }
+  -> Lines 24-28: Dictionary mapping source visit features to their configured weighting factors.
+
+Line 29:         score = pd.Series(0.0, index=X.index)
+  -> Initializes Series of zeroes matching DataFrame index.
+
+Line 30:         for col, w in cols.items():
+Line 31:             if col in X.columns:
+Line 32:                 raw = pd.to_numeric(X[col], errors="coerce").fillna(0)
+Line 33:                 lo, hi = raw.min(), raw.max()
+Line 34:                 norm = (raw - lo) / (hi - lo) if hi > lo else 0.0
+Line 35:                 score += w * norm
+  -> Lines 30-35: Normalizes each visit metric column between 0 and 1, applies configured weights, and sums into `score`.
+
+Line 36:         X["website_engagement_score"] = score
+  -> Appends new feature `website_engagement_score` to the DataFrame.
+
+Line 37:         return X
+  -> Returns transformed DataFrame.
+
+Line 38: 
+  -> Blank ending line.
+
+
+--------------------------------------------------------------------------------
+FILE 5: pipeline/model_training.py
+--------------------------------------------------------------------------------
+Line 1: """
+Line 2: pipeline/model_training.py
+Line 3: Train 6 candidate models with probability calibration (CalibratedClassifierCV),
+Line 4: evaluate on accuracy (+ F1 for reference), return the best-accuracy model and all metrics.
+Line 5: """
+  -> Lines 1-5: Module docstring describing model candidate training, probability calibration, and selection logic.
+
+Line 6: import numpy as np
+Line 7: from sklearn.calibration import CalibratedClassifierCV
+Line 8: from sklearn.linear_model import LogisticRegression
+Line 9: from sklearn.tree import DecisionTreeClassifier
+Line 10: from sklearn.ensemble import (
+Line 11:     RandomForestClassifier, GradientBoostingClassifier, AdaBoostClassifier,
+Line 12: )
+Line 13: from sklearn.metrics import accuracy_score, f1_score
+Line 14: from xgboost import XGBClassifier
+  -> Lines 6-14: Imports 6 classifier algorithms, probability calibration wrapper, and evaluation metrics.
+
+Line 15: 
+Line 16: import sys, os
+Line 17: sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+Line 18: import config
+  -> Lines 16-18: Path resolution and config import.
+
+Line 19: 
+Line 20: 
+Line 21: def get_models():
+Line 22:     """Return dict of model_name -> unfitted estimator."""
+  -> Function header initializing all candidate models.
+
+Line 23:     return {
+Line 24:         "LogisticRegression": LogisticRegression(
+Line 25:             max_iter=1000, class_weight="balanced", random_state=config.RANDOM_STATE,
+Line 26:         ),
+Line 27:         "DecisionTree": DecisionTreeClassifier(
+Line 28:             max_depth=10, class_weight="balanced", random_state=config.RANDOM_STATE,
+Line 29:         ),
+Line 30:         "RandomForest": RandomForestClassifier(
+Line 31:             n_estimators=200, class_weight="balanced",
+Line 32:             random_state=config.RANDOM_STATE, n_jobs=-1,
+Line 33:         ),
+Line 34:         "GradientBoosting": GradientBoostingClassifier(
+Line 35:             n_estimators=200, max_depth=5, learning_rate=0.05,
+Line 36:             random_state=config.RANDOM_STATE,
+Line 37:         ),
+Line 38:         "AdaBoost": AdaBoostClassifier(
+Line 39:             n_estimators=200, algorithm="SAMME", random_state=config.RANDOM_STATE,
+Line 40:         ),
+Line 41:         "XGBoost": XGBClassifier(
+Line 42:             n_estimators=200, max_depth=6, learning_rate=0.05,
+Line 43:             eval_metric="logloss", random_state=config.RANDOM_STATE, n_jobs=-1,
+Line 44:         ),
+Line 45:     }
+  -> Lines 23-45: Returns dictionary mapping model names to configured classifier instances with reproducible random seeds.
+
+Line 46: 
+Line 47: 
+Line 48: def train_all(X_train, y_train, X_test, y_test):
+Line 49:     """Train all candidates with probability calibration, return (best_model, best_name, all_metrics).
+Line 50: 
+Line 51:     Selection criterion: highest **accuracy** on the test set.
+Line 52:     Probability calibration via CalibratedClassifierCV ensures scores span full 0-100 range smoothly.
+Line 53:     """
+  -> Lines 48-53: Function header and docstring for training, calibrating, and evaluating all models.
+
+Line 54:     raw_models = get_models()
+  -> Fetches dictionary of unfitted base models.
+
+Line 55:     results = []
+  -> Initializes results list for storing benchmark stats.
+
+Line 56:     best_acc, best_model, best_name = -1, None, None
+  -> Initializes tracking variables for the best performing model.
+
+Line 57: 
+Line 58:     for name, raw_model in raw_models.items():
+  -> Loops through each candidate model.
+
+Line 59:         print(f"  Training & Calibrating {name} ...")
+  -> Prints progress status.
+
+Line 60:         calibrated_model = CalibratedClassifierCV(estimator=raw_model, method="sigmoid", cv=5)
+  -> Wraps base model in 5-fold sigmoid Platt probability calibration.
+
+Line 61:         calibrated_model.fit(X_train, y_train)
+  -> Fits the calibrated model on training data.
+
+Line 62:         
+Line 63:         preds = calibrated_model.predict(X_test)
+Line 64:         probs = calibrated_model.predict_proba(X_test)[:, 1]
+  -> Lines 63-64: Computes binary predictions and conversion probabilities on test set.
+
+Line 65:         
+Line 66:         acc = round(accuracy_score(y_test, preds), 4)
+Line 67:         f1 = round(f1_score(y_test, preds, zero_division=0), 4)
+Line 68:         min_score = round(float(probs.min()) * 100)
+Line 69:         max_score = round(float(probs.max()) * 100)
+  -> Lines 66-69: Calculates Accuracy, F1-Score, and minimum/maximum lead score bounds across test set.
+
+Line 70:         
+Line 71:         print(f"    {name}: accuracy={acc}  f1={f1}  (score range: {min_score} to {max_score})")
+  -> Prints model metrics.
+
+Line 72:         results.append({
+Line 73:             "model_name": name,
+Line 74:             "accuracy": acc,
+Line 75:             "f1": f1,
+Line 76:             "min_score": min_score,
+Line 77:             "max_score": max_score,
+Line 78:         })
+  -> Lines 72-78: Appends metrics dict to results list.
+
+Line 79: 
+Line 80:         if acc > best_acc:
+Line 81:             best_acc = acc
+Line 82:             best_model = calibrated_model
+Line 83:             best_name = name
+  -> Lines 80-83: Updates best model tracking variables if current model accuracy exceeds previous best.
+
+Line 84: 
+Line 85:     return best_model, best_name, results
+  -> Returns winning calibrated model, winner name, and metrics list.
+
+Line 86: 
+  -> Blank ending line.
+
+
+--------------------------------------------------------------------------------
+FILE 6: pipeline/train.py
+--------------------------------------------------------------------------------
+Line 1: """
+Line 2: pipeline/train.py
+Line 3: Orchestrates: preprocessing -> features -> training -> save artifacts.
+Line 4: Run with:  python pipeline/train.py
+Line 5: """
+  -> Lines 1-5: Module docstring declaring train.py as offline pipeline orchestrator script.
+
+Line 6: import json, os, sys
+Line 7: from datetime import datetime
+Line 8: 
+Line 9: import joblib
+Line 10: import numpy as np
+Line 11: from sklearn.model_selection import train_test_split
+Line 12: from sklearn.pipeline import Pipeline
+  -> Lines 6-12: Imports serialization (joblib, json), split utilities, and sklearn Pipeline.
+
+Line 13: 
+Line 14: sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+Line 15: import config
+Line 16: from pipeline.data_preprocessing import load_and_clean, classify_columns, build_full_pipeline
+Line 17: from pipeline.feature_engineering import FeatureEngineer
+Line 18: from pipeline.model_training import train_all
+  -> Lines 14-18: Imports config and pipeline modules.
+
+Line 19: 
+Line 20: 
+Line 21: def main():
+Line 22:     print("=== LeadScore AI — Training Pipeline ===\n")
+  -> Main execution entry function.
+
+Line 23: 
+Line 24:     # 1. Load & clean
+Line 25:     print("[1/5] Loading and cleaning data...")
+Line 26:     df = load_and_clean()
+Line 27:     print(f"      {len(df)} rows * {df.shape[1]} cols after cleaning")
+  -> Lines 24-27: Step 1: Loads and cleans raw CSV.
+
+Line 28: 
+Line 29:     # 2. Split
+Line 30:     print("[2/5] Train/test split (80/20)...")
+Line 31:     X = df.drop(columns=["Converted"])
+Line 32:     y = df["Converted"]
+Line 33:     X_train, X_test, y_train, y_test = train_test_split(
+Line 34:         X, y, test_size=config.TEST_SIZE,
+Line 35:         stratify=y, random_state=config.RANDOM_STATE,
+Line 36:     )
+Line 37:     print(f"      Train: {len(X_train)}  |  Test: {len(X_test)}")
+  -> Lines 29-37: Step 2: Performs 80/20 stratified train-test split.
+
+Line 38: 
+Line 39:     # 3. Feature engineering
+Line 40:     print("[3/5] Feature engineering...")
+Line 41:     fe = FeatureEngineer()
+Line 42:     X_train_fe = fe.fit_transform(X_train)
+Line 43:     X_test_fe = fe.transform(X_test)
+  -> Lines 39-43: Step 3: Fits and applies `FeatureEngineer` on train and test sets.
+
+Line 44: 
+Line 45:     # 4. Preprocessing
+Line 46:     print("[4/5] Building & fitting preprocessor...")
+Line 47:     num_cols, low_cats, high_cats = classify_columns(
+Line 48:         X_train_fe.assign(Converted=y_train.values)
+Line 49:     )
+Line 50:     preprocessor = build_full_pipeline(num_cols, low_cats, high_cats)
+Line 51:     X_train_t = preprocessor.fit_transform(X_train_fe)
+Line 52:     X_test_t = preprocessor.transform(X_test_fe)
+Line 53:     print(f"      Transformed shape: {X_train_t.shape}")
+  -> Lines 45-53: Step 4: Classifies columns, builds `build_full_pipeline()`, and fits preprocessor on training features.
+
+Line 54: 
+Line 55:     # Bundle feature engineer + preprocessor so inference needs only one .pkl
+Line 56:     full_pipeline = Pipeline([
+Line 57:         ("feature_engineer", fe),
+Line 58:         ("preprocessor", preprocessor),
+Line 59:     ])
+  -> Lines 55-59: Bundles feature engineer and preprocessor into a single full pipeline object.
+
+Line 60: 
+Line 61:     # 5. Train & select best
+Line 62:     print("[5/5] Training 6 candidate models...")
+Line 63:     best_model, best_name, all_metrics = train_all(
+Line 64:         X_train_t, y_train.values, X_test_t, y_test.values,
+Line 65:     )
+Line 66:     best_metrics = next(m for m in all_metrics if m["model_name"] == best_name)
+  -> Lines 61-66: Step 5: Trains all 6 candidate models, selects best model by accuracy, and extracts winner metrics.
+
+Line 67: 
+Line 68:     # Save
+Line 69:     os.makedirs(config.MODELS_DIR, exist_ok=True)
+Line 70:     joblib.dump(best_model, config.MODEL_PATH)
+Line 71:     joblib.dump(full_pipeline, config.PREPROCESSOR_PATH)
+  -> Lines 68-71: Creates `models/` directory and serializes `model.pkl` and `preprocessor.pkl` with joblib.
+
+Line 72: 
+Line 73: 
+Line 74: 
+Line 75:     meta = {
+Line 76:         "best_model": best_name,
+Line 77:         "best_accuracy": best_metrics["accuracy"],
+Line 78:         "best_f1": best_metrics["f1"],
+Line 79:         "training_date": datetime.now().isoformat(),
+Line 80:         "all_models": all_metrics,
+Line 81:     }
+Line 82:     with open(config.METADATA_PATH, "w") as f:
+Line 83:         json.dump(meta, f, indent=2)
+  -> Lines 75-83: Creates and saves model training metadata and all model benchmarks to `model_metadata.json`.
+
+Line 84: 
+Line 85:     print(f"\nWinner: {best_name}  (accuracy={best_metrics['accuracy']})")
+Line 86:     print(f"Saved:  {config.MODEL_PATH}")
+Line 87:     print(f"        {config.PREPROCESSOR_PATH}")
+Line 88:     print(f"        {config.METADATA_PATH}")
+Line 89:     print("\n=== Done ===")
+  -> Lines 85-89: Prints summary output to console.
+
+Line 90: 
+Line 91: 
+Line 92: if __name__ == "__main__":
+Line 93:     main()
+  -> Lines 92-93: Standard Python script execution entry point calling `main()`.
+
+
+--------------------------------------------------------------------------------
+FILE 7: utils/scoring.py
+--------------------------------------------------------------------------------
+Line 1: """
+Line 2: utils/scoring.py — Lead Score computation and priority classification.
+Line 3: """
+  -> Lines 1-3: Module docstring for Lead Score math and band mapping functions.
+
+Line 4: import sys, os
+Line 5: sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+Line 6: import config
+  -> Lines 4-6: System path insertion and config import.
+
+Line 7: 
+Line 8: 
+Line 9: def compute_lead_score(probability: float) -> int:
+Line 10:     """Convert probability [0, 1] -> Lead Score [0, 100]."""
+Line 11:     return max(0, min(100, round(float(probability) * 100)))
+  -> Lines 9-11: Converts conversion probability [0.0, 1.0] to integer score [0, 100], clamped between 0 and 100.
+
+Line 12: 
+Line 13: 
+Line 14: def get_priority_band(score: int) -> str:
+Line 15:     """Map a Lead Score to its named priority band."""
+Line 16:     for band, (lo, hi) in config.SCORE_BANDS.items():
+Line 17:         if lo <= score <= hi:
+Line 18:             return band
+Line 19:     return "Very Cold"
+  -> Lines 14-19: Iterates over SCORE_BANDS thresholds and returns the priority band string matching the score.
+
+Line 20: 
+Line 21: 
+Line 22: def get_recommendation(band: str) -> str:
+Line 23:     """Return a sales action string for the given band."""
+Line 24:     return config.BAND_ACTIONS.get(band, "Review manually")
+  -> Lines 22-24: Looks up and returns the sales recommendation string for a priority band.
+
+Line 25: 
+Line 26: 
+Line 27: def get_band_color(band: str) -> str:
+Line 28:     """Return hex colour for the given band."""
+Line 29:     return config.BAND_COLORS.get(band, "#94a3b8")
+  -> Lines 27-29: Looks up and returns the hex UI color code for a priority band.
+
+Line 30: 
+Line 31: 
+Line 32: def score_lead(probability: float) -> dict:
+Line 33:     """One-call helper: probability -> full scoring dict."""
+Line 34:     score = compute_lead_score(probability)
+Line 35:     band = get_priority_band(score)
+Line 36:     return {
+Line 37:         "lead_score": score,
+Line 38:         "priority": band,
+Line 39:         "recommendation": get_recommendation(band),
+Line 40:         "band_color": get_band_color(band),
+Line 41:     }
+  -> Lines 32-41: Single helper function accepting probability and returning dictionary of score, band, recommendation, and color.
+
+Line 42: 
+  -> Blank ending line.
+
+
+--------------------------------------------------------------------------------
+FILE 8: utils/prediction.py
+--------------------------------------------------------------------------------
+Line 1: """
+Line 2: utils/prediction.py — Load model/preprocessor, run inference.
+Line 3: """
+  -> Lines 1-3: Module docstring for artifact loading and model inference.
+
+Line 4: import json, os, sys
+Line 5: import joblib
+Line 6: import numpy as np
+Line 7: import pandas as pd
+Line 8: from sklearn.pipeline import Pipeline
+  -> Lines 4-8: Imports standard serialization, numeric, pandas, and sklearn Pipeline modules.
+
+Line 9: 
+Line 10: sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+Line 11: import config
+Line 12: from utils.scoring import score_lead
+  -> Lines 10-12: Imports config and `score_lead`.
+
+Line 13: 
+Line 14: 
+Line 15: def load_model():
+Line 16:     """Load the trained classifier."""
+Line 17:     if not os.path.exists(config.MODEL_PATH):
+Line 18:         raise FileNotFoundError(f"Model not found at {config.MODEL_PATH}. Run pipeline/train.py first.")
+Line 19:     return joblib.load(config.MODEL_PATH)
+  -> Lines 15-19: Loads `model.pkl` classifier from disk using joblib, raising error if not found.
+
+Line 20: 
+Line 21: 
+Line 22: def load_preprocessor():
+Line 23:     """Load the fitted preprocessing pipeline."""
+Line 24:     if not os.path.exists(config.PREPROCESSOR_PATH):
+Line 25:         raise FileNotFoundError(f"Preprocessor not found at {config.PREPROCESSOR_PATH}. Run pipeline/train.py first.")
+Line 26:     return joblib.load(config.PREPROCESSOR_PATH)
+  -> Lines 22-26: Loads `preprocessor.pkl` preprocessing pipeline from disk using joblib.
+
+Line 27: 
+Line 28: 
+Line 29: def load_metadata():
+Line 30:     """Load model metadata JSON."""
+Line 31:     if not os.path.exists(config.METADATA_PATH):
+Line 32:         return {}
+Line 33:     with open(config.METADATA_PATH) as f:
+Line 34:         return json.load(f)
+  -> Lines 29-34: Loads model metadata dictionary from `model_metadata.json`.
+
+Line 35: 
+Line 36: 
+Line 37: def _get_expected_columns(preprocessor):
+Line 38:     """Extract columns the pipeline's inner ColumnTransformer expects."""
+Line 39:     try:
+Line 40:         ct = preprocessor.named_steps["preprocessor"].named_steps["column_transformer"]
+Line 41:         cols = []
+Line 42:         for _, _, feature_cols in ct.transformers_:
+Line 43:             if isinstance(feature_cols, list):
+Line 44:                 cols.extend(feature_cols)
+Line 45:         return cols
+Line 46:     except Exception:
+Line 47:         return []
+  -> Lines 37-47: Private helper extracting feature column names expected by ColumnTransformer.
+
+Line 48: 
+Line 49: 
+Line 50: def align_columns(df, preprocessor):
+Line 51:     """Pad missing columns with NaN so the pipeline doesn't error."""
+Line 52:     df = df.copy()
+Line 53:     for col in _get_expected_columns(preprocessor):
+Line 54:         if col not in df.columns:
+Line 55:             df[col] = np.nan
+Line 56:     return df
+  -> Lines 50-56: Pads missing features with `np.nan` so inference single rows match ColumnTransformer input schema.
+
+Line 57: 
+Line 58: 
+Line 59: def predict_single(input_df, preprocessor, model):
+Line 60:     """Run inference on a one-row DataFrame.
+Line 61:     Returns (prediction: int, probability: float).
+Line 62:     """
+Line 63:     aligned = align_columns(input_df, preprocessor)
+Line 64:     X_t = preprocessor.transform(aligned)
+Line 65:     prediction = int(model.predict(X_t)[0])
+Line 66:     probability = float(model.predict_proba(X_t)[0, 1])
+Line 67:     return prediction, probability
+  -> Lines 59-67: Performs inference on a single lead input row, returning predicted class binary (0/1) and conversion probability float.
+
+Line 68: 
+  -> Blank ending line.
+
+
+--------------------------------------------------------------------------------
+FILE 9: utils/database.py
+--------------------------------------------------------------------------------
+Line 1: """
+Line 2: utils/database.py — SQLite persistence for prediction history with auto-recovery.
+Line 3: """
+  -> Lines 1-3: Module docstring for SQLite database integration and corrupt file recovery.
+
+Line 4: import json, os, sqlite3, logging
+Line 5: from datetime import datetime
+Line 6: import pandas as pd
+  -> Lines 4-6: Imports JSON, OS, SQLite3, logging, datetime, and pandas.
+
+Line 7: 
+Line 8: import sys
+Line 9: sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+Line 10: import config
+  -> Lines 8-10: Path resolution and config import.
+
+Line 11: 
+Line 12: logger = logging.getLogger(__name__)
+  -> Initializes module logger.
+
+Line 13: 
+Line 14: 
+Line 15: def _reset_db():
+Line 16:     """Remove corrupted DB file if it exists."""
+Line 17:     if os.path.exists(config.DB_PATH):
+Line 18:         try:
+Line 19:             os.remove(config.DB_PATH)
+Line 20:             logger.warning("Corrupted database removed. A new database will be created.")
+Line 21:         except Exception as e:
+Line 22:             logger.error(f"Failed to delete corrupted database: {e}")
+  -> Lines 15-22: Helper function removing corrupt database file from disk.
+
+Line 23: 
+Line 24: 
+Line 25: def init_db():
+Line 26:     """Create the predictions table if it doesn't exist. Re-creates if corrupted."""
+Line 27:     os.makedirs(config.DB_DIR, exist_ok=True)
+Line 28:     try:
+Line 29:         with sqlite3.connect(config.DB_PATH) as conn:
+Line 30:             conn.execute("""
+Line 31:                 CREATE TABLE IF NOT EXISTS predictions (
+Line 32:                     id             INTEGER PRIMARY KEY AUTOINCREMENT,
+Line 33:                     timestamp      TEXT    NOT NULL,
+Line 34:                     input_json     TEXT    NOT NULL,
+Line 35:                     prediction     INTEGER NOT NULL,
+Line 36:                     probability    REAL    NOT NULL,
+Line 37:                     lead_score     INTEGER NOT NULL,
+Line 38:                     priority       TEXT    NOT NULL,
+Line 39:                     recommendation TEXT    NOT NULL
+Line 40:                 )
+Line 41:             """)
+Line 42:             conn.commit()
+Line 43:     except sqlite3.DatabaseError as e:
+Line 44:         logger.error(f"Database error encountered: {e}. Resetting database...")
+Line 45:         _reset_db()
+Line 46:         # Retry creation with clean DB file
+Line 47:         with sqlite3.connect(config.DB_PATH) as conn:
+Line 48:             conn.execute("""
+Line 49:                 CREATE TABLE IF NOT EXISTS predictions (
+Line 50:                     id             INTEGER PRIMARY KEY AUTOINCREMENT,
+Line 51:                     timestamp      TEXT    NOT NULL,
+Line 52:                     input_json     TEXT    NOT NULL,
+Line 53:                     prediction     INTEGER NOT NULL,
+Line 54:                     probability    REAL    NOT NULL,
+Line 55:                     lead_score     INTEGER NOT NULL,
+Line 56:                     priority       TEXT    NOT NULL,
+Line 57:                     recommendation TEXT    NOT NULL
+Line 58:                 )
+Line 59:             """)
+Line 60:             conn.commit()
+  -> Lines 25-60: Creates `predictions` table schema in SQLite database, with catch-and-recovery block if DB file is malformed.
+
+Line 61: 
+Line 62: 
+Line 63: def save_prediction(input_dict, prediction, probability, lead_score, priority, recommendation):
+Line 64:     """Insert one prediction row."""
+Line 65:     init_db()
+Line 66:     try:
+Line 67:         with sqlite3.connect(config.DB_PATH) as conn:
+Line 68:             conn.execute(
+Line 69:                 """INSERT INTO predictions
+Line 70:                    (timestamp, input_json, prediction, probability, lead_score, priority, recommendation)
+Line 71:                    VALUES (?, ?, ?, ?, ?, ?, ?)""",
+Line 72:                 (datetime.now().isoformat(),
+Line 73:                  json.dumps(input_dict, default=str),
+Line 74:                  int(prediction), float(probability),
+Line 75:                  int(lead_score), str(priority), str(recommendation)),
+Line 76:             )
+Line 77:             conn.commit()
+Line 78:     except sqlite3.DatabaseError as e:
+Line 79:         logger.error(f"Failed to save prediction due to DB error: {e}")
+Line 80:         _reset_db()
+Line 81:         init_db()
+  -> Lines 63-81: Inserts a single prediction record into `predictions` table with timestamp and JSON features, handling DB errors gracefully.
+
+Line 82: 
+Line 83: 
+Line 84: def get_history(limit=500):
+Line 85:     """Return recent predictions as a DataFrame."""
+Line 86:     init_db()
+Line 87:     try:
+Line 88:         with sqlite3.connect(config.DB_PATH) as conn:
+Line 89:             return pd.read_sql_query(
+Line 90:                 f"SELECT * FROM predictions ORDER BY id DESC LIMIT {int(limit)}", conn
+Line 91:             )
+Line 92:     except Exception as e:
+Line 93:         logger.error(f"Error fetching history: {e}")
+Line 94:         return pd.DataFrame()
+  -> Lines 84-94: Queries and returns the recent `limit` prediction records as a pandas DataFrame.
+
+Line 95: 
+Line 96: 
+Line 97: def get_stats():
+Line 98:     """Aggregate stats from prediction history."""
+Line 99:     init_db()
+Line 100:     default = {"total": 0, "avg_score": 0, "converts": 0, "conversion_rate": 0}
+Line 101:     try:
+Line 102:         with sqlite3.connect(config.DB_PATH) as conn:
+Line 103:             cur = conn.cursor()
+Line 104:             cur.execute("SELECT COUNT(*) FROM predictions")
+Line 105:             total = cur.fetchone()[0] or 0
+Line 106:             if total == 0:
+Line 107:                 return default
+Line 108:             cur.execute("SELECT AVG(lead_score) FROM predictions")
+Line 109:             avg = round(cur.fetchone()[0] or 0, 1)
+Line 110:             cur.execute("SELECT COUNT(*) FROM predictions WHERE prediction = 1")
+Line 111:             converts = cur.fetchone()[0] or 0
+Line 112:         return {
+Line 113:             "total": total,
+Line 114:             "avg_score": avg,
+Line 115:             "converts": converts,
+Line 116:             "conversion_rate": round(converts / total * 100, 1),
+Line 117:         }
+Line 118:     except Exception as e:
+Line 119:         logger.error(f"Error computing stats: {e}")
+Line 120:         return default
+  -> Lines 97-120: Computes aggregate statistics (total count, average lead score, converted lead count, predicted conversion rate %).
+
+Line 121: 
+Line 122: 
+Line 123: def clear_history():
+Line 124:     """Delete all rows and return count deleted."""
+Line 125:     init_db()
+Line 126:     try:
+Line 127:         with sqlite3.connect(config.DB_PATH) as conn:
+Line 128:             cur = conn.execute("DELETE FROM predictions")
+Line 129:             conn.commit()
+Line 130:             return cur.rowcount
+Line 131:     except Exception as e:
+Line 132:         logger.error(f"Error clearing history: {e}")
+Line 133:         return 0
+  -> Lines 123-133: Deletes all records from `predictions` table and returns row deletion count.
+
+Line 134: 
+  -> Blank ending line.
+
+
+--------------------------------------------------------------------------------
+FILE 10: utils/visualization.py
+--------------------------------------------------------------------------------
+Line 1: """
+Line 2: utils/visualization.py — Plotly charts for Dashboard and History pages.
+Line 3: """
+  -> Lines 1-3: Module docstring for Plotly chart functions.
+
+Line 4: import plotly.graph_objects as go
+Line 5: import pandas as pd
+  -> Imports Plotly Graph Objects and pandas.
+
+Line 6: 
+Line 7: import sys, os
+Line 8: sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+Line 9: import config
+  -> Path resolution and config import.
+
+Line 10: 
+Line 11: _DARK = dict(
+Line 12:     template="plotly_dark",
+Line 13:     paper_bgcolor="rgba(0,0,0,0)",
+Line 14:     plot_bgcolor="rgba(0,0,0,0)",
+Line 15: )
+  -> Lines 11-15: Global dictionary specifying dark theme background and template for Plotly charts.
+
+Line 16: 
+Line 17: 
+Line 18: def plot_score_distribution(scores, title="Lead Score Distribution"):
+Line 19:     """Histogram of lead scores coloured by band."""
+Line 20:     fig = go.Figure(go.Histogram(
+Line 21:         x=scores, nbinsx=20, marker_color="#6366f1", opacity=0.85,
+Line 22:     ))
+Line 23:     fig.update_layout(title=title, xaxis_title="Lead Score", yaxis_title="Count",
+Line 24:                       height=350, **_DARK)
+Line 25:     return fig
+  -> Lines 18-25: Renders a Plotly histogram chart showing Lead Score distribution.
+
+Line 26: 
+Line 27: 
+Line 28: def plot_priority_pie(priorities, title="Priority Breakdown"):
+Line 29:     """Donut chart of priority band counts."""
+Line 30:     counts = priorities.value_counts()
+Line 31:     colors = [config.BAND_COLORS.get(b, "#94a3b8") for b in counts.index]
+Line 32:     fig = go.Figure(go.Pie(
+Line 33:         labels=counts.index, values=counts.values,
+Line 34:         hole=0.45, marker=dict(colors=colors),
+Line 35:     ))
+Line 36:     fig.update_layout(title=title, height=350, **_DARK)
+Line 37:     return fig
+  -> Lines 28-37: Renders a Plotly donut pie chart displaying priority band counts color-coded by configuration.
+
+Line 38: 
+Line 39: 
+Line 40: def plot_conversion_bar(history_df, title="Predicted Outcomes"):
+Line 41:     """Bar chart of predicted Convert vs Not Convert."""
+Line 42:     if "prediction" not in history_df.columns or history_df.empty:
+Line 43:         return go.Figure()
+Line 44:     counts = history_df["prediction"].value_counts().sort_index()
+Line 45:     labels = {0: "Won't Convert", 1: "Will Convert"}
+Line 46:     colors = {0: "#ef4444", 1: "#10b981"}
+Line 47:     fig = go.Figure(go.Bar(
+Line 48:         x=[labels.get(k, str(k)) for k in counts.index],
+Line 49:         y=counts.values,
+Line 50:         marker_color=[colors.get(k, "#6366f1") for k in counts.index],
+Line 51:     ))
+Line 52:     fig.update_layout(title=title, yaxis_title="Count", height=350, **_DARK)
+Line 53:     return fig
+  -> Lines 40-53: Renders a Plotly vertical bar chart comparing predicted Converts vs Non-Converts.
+
+Line 54: 
+Line 55: 
+Line 56: def plot_gauge(score, title="Lead Score"):
+Line 57:     """Gauge chart showing a single lead score."""
+Line 58:     fig = go.Figure(go.Indicator(
+Line 59:         mode="gauge+number",
+Line 60:         value=score,
+Line 61:         title={"text": title, "font": {"color": "#f1f5f9"}},
+Line 62:         gauge=dict(
+Line 63:             axis=dict(range=[0, 100], tickcolor="#64748b"),
+Line 64:             bar=dict(color="#6366f1"),
+Line 65:             bgcolor="rgba(0,0,0,0)",
+Line 66:             steps=[
+Line 67:                 {"range": [0, 25],  "color": "#312e81"},
+Line 68:                 {"range": [25, 50], "color": "#3730a3"},
+Line 69:                 {"range": [50, 75], "color": "#4338ca"},
+Line 70:                 {"range": [75, 90], "color": "#6366f1"},
+Line 71:                 {"range": [90, 100],"color": "#818cf8"},
+Line 72:             ],
+Line 73:         ),
+Line 74:     ))
+Line 75:     fig.update_layout(height=280, **_DARK)
+Line 76:     return fig
+  -> Lines 56-76: Renders a Plotly radial gauge chart showing an individual Lead Score from 0 to 100.
+
+Line 77: 
+Line 78: 
+Line 79: def plot_leads_by_source(df, col="Lead Source", title="Leads by Source"):
+Line 80:     """Horizontal bar of lead counts per source (from raw data)."""
+Line 81:     if col not in df.columns:
+Line 82:         return go.Figure()
+Line 83:     counts = df[col].value_counts().head(10)
+Line 84:     fig = go.Figure(go.Bar(
+Line 85:         x=counts.values, y=counts.index, orientation="h",
+Line 86:         marker_color="#6366f1",
+Line 87:     ))
+Line 88:     fig.update_layout(title=title, xaxis_title="Count", height=350,
+Line 89:                       yaxis=dict(autorange="reversed"), **_DARK)
+Line 90:     return fig
+  -> Lines 79-90: Renders a Plotly horizontal bar chart displaying top 10 categories for Lead Source / Origin.
+
+Line 91: 
+  -> Blank ending line.
+
+
+--------------------------------------------------------------------------------
+FILE 11: pages/1_🏠_Home.py
+--------------------------------------------------------------------------------
+Line 1: """
+Line 2: pages/1_🏠_Home.py — Landing page: what the app does, dataset summary.
+Line 3: """
+  -> Lines 1-3: Module docstring for Home page.
+
+Line 4: import os, sys
+Line 5: import streamlit as st
+Line 6: import pandas as pd
+Line 7: import numpy as np
+  -> Lines 4-7: Imports OS, sys, Streamlit, pandas, and numpy.
+
+Line 8: 
+Line 9: sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+Line 10: import config
+  -> Path resolution and config import.
+
+Line 11: 
+Line 12: st.set_page_config(page_title="Home | LeadScore AI", page_icon="🏠", layout="wide")
+Line 13: st.markdown('<h1 class="gradient-text">🏠 Home</h1>', unsafe_allow_html=True)
+  -> Lines 12-13: Sets page title, favicon icon, wide layout, and renders page header.
+
+Line 14: 
+Line 15: # ── What the app does ─────────────────────────────────────────────────────────
+Line 16: st.markdown("""
+Line 17: ### What is LeadScore AI?
+Line 18: 
+Line 19: **X Education** receives thousands of leads but only **~30 %** convert into paying customers.
+Line 20: This app uses machine learning to predict each lead's conversion probability and assigns a
+Line 21: **Lead Score (0–100)** so the sales team can focus on the highest-intent prospects first.
+Line 22: """)
+  -> Lines 15-22: Renders project narrative and problem statement.
+
+Line 23: 
+Line 24: st.markdown("---")
+  -> Horizontal divider.
+
+Line 25: 
+Line 26: # ── Priority band legend ─────────────────────────────────────────────────────
+Line 27: st.markdown("### 🏷️ Priority Bands")
+Line 28: cols = st.columns(5)
+Line 29: for col, (band, (lo, hi)) in zip(cols, config.SCORE_BANDS.items()):
+Line 30:     color = config.BAND_COLORS[band]
+Line 31:     action = config.BAND_ACTIONS[band]
+Line 32:     with col:
+Line 33:         st.markdown(f"""
+Line 34:         <div style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);
+Line 35:                     border-radius:12px;padding:1rem;text-align:center;border-top:3px solid {color};">
+Line 36:           <div style="font-weight:800;color:{color};font-size:1.1rem;">{band}</div>
+Line 37:           <div style="color:#94a3b8;font-size:0.8rem;margin:0.25rem 0;">{lo}–{hi}</div>
+Line 38:           <div style="color:#cbd5e1;font-size:0.75rem;">{action}</div>
+Line 39:         </div>
+Line 40:         """, unsafe_allow_html=True)
+  -> Lines 26-40: Renders 5 column cards displaying priority bands, score ranges, and sales actions.
+
+Line 41: 
+Line 42: st.markdown("---")
+  -> Horizontal divider.
+
+Line 43: 
+Line 44: # ── Dataset summary ───────────────────────────────────────────────────────────
+Line 45: st.markdown("### 📦 Dataset Summary")
+Line 46: if os.path.exists(config.DATA_PATH):
+Line 47:     df = pd.read_csv(config.DATA_PATH)
+Line 48:     df.replace("Select", np.nan, inplace=True)
+Line 49: 
+Line 50:     c1, c2, c3, c4 = st.columns(4)
+Line 51:     c1.metric("Total Leads", f"{len(df):,}")
+Line 52:     c2.metric("Features", df.shape[1])
+Line 53:     conv_rate = round(df["Converted"].mean() * 100, 1) if "Converted" in df.columns else 0
+Line 54:     c3.metric("Conversion Rate", f"{conv_rate}%")
+Line 55:     c4.metric("Missing Cells", f"{int(df.isnull().sum().sum()):,}")
+Line 56: 
+Line 57:     with st.expander("📋 Sample rows"):
+Line 58:         st.dataframe(df.head(10), use_container_width=True)
+Line 59: 
+Line 60:     with st.expander("📋 Column dtypes"):
+Line 61:         dtypes = df.dtypes.reset_index()
+Line 62:         dtypes.columns = ["Column", "Type"]
+Line 63:         dtypes["Type"] = dtypes["Type"].astype(str)
+Line 64:         st.dataframe(dtypes, use_container_width=True, hide_index=True)
+Line 65: else:
+Line 66:     st.warning("Dataset not found. Place `Lead Scoring.csv` in the project root.")
+  -> Lines 45-66: Reads dataset CSV, renders KPI metrics cards (total leads, features count, conversion rate %, missing cells), sample data preview expander, and column data type expander.
+
+
+--------------------------------------------------------------------------------
+FILE 12: pages/2_📊_Dashboard.py
+--------------------------------------------------------------------------------
+Line 1: """
+Line 2: pages/2_📊_Dashboard.py — Charts: conversion rate, score distribution, leads by source, prediction stats.
+Line 3: """
+  -> Lines 1-3: Module docstring for Dashboard page.
+
+Line 4: import os, sys
+Line 5: import streamlit as st
+Line 6: import pandas as pd
+Line 7: import numpy as np
+  -> Imports OS, sys, Streamlit, pandas, numpy.
+
+Line 8: 
+Line 9: sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+Line 10: import config
+Line 11: from utils.database import get_history, get_stats
+Line 12: from utils.visualization import (
+Line 13:     plot_score_distribution, plot_priority_pie,
+Line 14:     plot_conversion_bar, plot_leads_by_source,
+Line 15: )
+  -> Lines 9-15: Path resolution, config import, and database/visualization function imports.
+
+Line 16: 
+Line 17: st.set_page_config(page_title="Dashboard | LeadScore AI", page_icon="📊", layout="wide")
+Line 18: st.markdown('<h1 class="gradient-text">📊 Dashboard</h1>', unsafe_allow_html=True)
+  -> Lines 17-18: Configures Streamlit page title, icon, wide layout, and gradient header.
+
+Line 19: 
+Line 20: # ── KPI row from prediction history ──────────────────────────────────────────
+Line 21: stats = get_stats()
+Line 22: c1, c2, c3, c4 = st.columns(4)
+Line 23: c1.metric("Total Predictions", stats["total"])
+Line 24: c2.metric("Avg Lead Score", stats["avg_score"])
+Line 25: c3.metric("Predicted Converts", stats["converts"])
+Line 26: c4.metric("Predicted Conv Rate", f"{stats['conversion_rate']}%")
+  -> Lines 21-26: Fetches database prediction stats and displays top KPI cards.
+
+Line 27: 
+Line 28: st.markdown("---")
+  -> Divider line.
+
+Line 29: 
+Line 30: # ── Dataset-level charts ──────────────────────────────────────────────────────
+Line 31: st.markdown("### 📈 Dataset Overview")
+Line 32: if os.path.exists(config.DATA_PATH):
+Line 33:     raw = pd.read_csv(config.DATA_PATH)
+Line 34:     raw.replace("Select", np.nan, inplace=True)
+Line 35: 
+Line 36:     col1, col2 = st.columns(2)
+Line 37:     with col1:
+Line 38:         if "Converted" in raw.columns:
+Line 39:             conv = raw["Converted"].value_counts()
+Line 40:             labels = {0: "Not Converted", 1: "Converted"}
+Line 41:             import plotly.graph_objects as go
+Line 42:             fig = go.Figure(go.Pie(
+Line 43:                 labels=[labels.get(k, str(k)) for k in conv.index],
+Line 44:                 values=conv.values, hole=0.45,
+Line 45:                 marker=dict(colors=["#ef4444", "#10b981"]),
+Line 46:             ))
+Line 47:             fig.update_layout(title="Dataset Conversion Rate", height=350,
+Line 48:                               template="plotly_dark", paper_bgcolor="rgba(0,0,0,0)",
+Line 49:                               plot_bgcolor="rgba(0,0,0,0)")
+Line 50:             st.plotly_chart(fig, use_container_width=True)
+Line 51:     with col2:
+Line 52:         fig_src = plot_leads_by_source(raw)
+Line 53:         st.plotly_chart(fig_src, use_container_width=True)
+Line 54: 
+Line 55:     col1, col2 = st.columns(2)
+Line 56:     with col1:
+Line 57:         if "Lead Origin" in raw.columns:
+Line 58:             fig_origin = plot_leads_by_source(raw, col="Lead Origin", title="Leads by Origin")
+Line 59:             st.plotly_chart(fig_origin, use_container_width=True)
+Line 60: else:
+Line 61:     st.info("Dataset not found — dataset charts will appear after placing `Lead Scoring.csv`.")
+  -> Lines 31-61: Renders raw dataset visual analytics: Dataset Conversion Rate donut chart, Leads by Source horizontal bar chart, and Leads by Origin bar chart.
+
+Line 62: 
+Line 63: # ── Prediction history charts ─────────────────────────────────────────────────
+Line 64: st.markdown("---")
+Line 65: st.markdown("### 📊 Prediction History Charts")
+Line 66: history = get_history(limit=1000)
+Line 67: if history.empty:
+Line 68:     st.info("No predictions yet. Use **🎯 Predict Lead** to score leads.")
+Line 69: else:
+Line 70:     col1, col2 = st.columns(2)
+Line 71:     with col1:
+Line 72:         if "lead_score" in history.columns:
+Line 73:             fig = plot_score_distribution(history["lead_score"])
+74:             st.plotly_chart(fig, use_container_width=True)
+Line 75:     with col2:
+Line 76:         if "priority" in history.columns:
+Line 77:             fig = plot_priority_pie(history["priority"])
+Line 78:             st.plotly_chart(fig, use_container_width=True)
+Line 79: 
+Line 80:     fig_bar = plot_conversion_bar(history)
+Line 81:     st.plotly_chart(fig_bar, use_container_width=True)
+Line 82: 
+  -> Lines 63-82: Fetches prediction history from SQLite and renders score distribution histogram, priority band donut pie chart, and predicted outcomes bar chart.
+
+
+--------------------------------------------------------------------------------
+FILE 13: pages/3_🎯_Predict_Lead.py
+--------------------------------------------------------------------------------
+Line 1: """
+Line 2: pages/3_🎯_Predict_Lead.py — Form to enter one lead's details and get a prediction.
+Line 3: """
+  -> Lines 1-3: Module docstring for Predict Lead page.
+
+Line 4: import os, sys
+Line 5: import streamlit as st
+Line 6: import pandas as pd
+Line 7: import numpy as np
+  -> Lines 4-7: Standard imports.
+
+Line 8: 
+Line 9: sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+Line 10: import config
+Line 11: from utils.prediction import load_model, load_preprocessor, predict_single
+Line 12: from utils.scoring import score_lead
+Line 13: from utils.database import save_prediction
+Line 14: from utils.visualization import plot_gauge
+  -> Lines 9-14: Imports config and prediction, scoring, database, and gauge chart utilities.
+
+Line 15: 
+Line 16: st.set_page_config(page_title="Predict Lead | LeadScore AI", page_icon="🎯", layout="wide")
+Line 17: st.markdown('<h1 class="gradient-text">🎯 Predict Lead</h1>', unsafe_allow_html=True)
+  -> Lines 16-17: Configures page layout and header.
+
+Line 18: 
+Line 19: # ── Check model exists ────────────────────────────────────────────────────────
+Line 20: if not os.path.exists(config.MODEL_PATH):
+Line 21:     st.error("No trained model found. Run `python pipeline/train.py` first.")
+Line 22:     st.stop()
+  -> Lines 19-22: Checks if model artifact exists on disk; stops execution with error banner if missing.
+
+Line 23: 
+Line 24: 
+Line 25: @st.cache_resource
+Line 26: def _load_artifacts():
+Line 27:     return load_model(), load_preprocessor()
+Line 28: 
+Line 29: 
+Line 30: model, preprocessor = _load_artifacts()
+  -> Lines 25-30: Caches and loads trained classifier model and preprocessing pipeline.
+
+Line 31: 
+Line 32: # ── Load dataset for dropdown values ──────────────────────────────────────────
+Line 33: 
+Line 34: @st.cache_data
+Line 35: def _load_raw():
+Line 36:     df = pd.read_csv(config.DATA_PATH)
+Line 37:     df.replace("Select", np.nan, inplace=True)
+Line 38:     return df
+Line 39: 
+Line 40: raw = _load_raw()
+  -> Lines 34-40: Caches and loads raw dataset to extract unique categorical field options.
+
+Line 41: 
+Line 42: def _unique(col):
+Line 43:     """Return sorted unique non-null values for a column."""
+Line 44:     if col in raw.columns:
+Line 45:         vals = raw[col].dropna().unique().tolist()
+Line 46:         return sorted([str(v) for v in vals])
+Line 47:     return []
+  -> Lines 42-47: Helper function extracting sorted unique dropdown options for a given dataset column.
+
+Line 48: 
+Line 49: 
+Line 50: # ── Input form ────────────────────────────────────────────────────────────────
+Line 51: st.markdown("Fill in the lead attributes below.")
+Line 52: 
+Line 53: col1, col2, col3 = st.columns(3)
+Line 54: with col1:
+Line 55:     lead_origin = st.selectbox("Lead Origin", _unique("Lead Origin"))
+Line 56:     lead_source = st.selectbox("Lead Source", _unique("Lead Source"))
+Line 57:     last_activity = st.selectbox("Last Activity", _unique("Last Activity"))
+Line 58:     specialization = st.selectbox("Specialization", _unique("Specialization"))
+Line 59: 
+Line 60: with col2:
+Line 61:     total_visits = st.number_input("Total Visits", min_value=0, max_value=200, value=3)
+Line 62:     time_spent = st.slider("Total Time Spent on Website (min)", 0, 2500, 300)
+Line 63:     page_views = st.slider("Page Views Per Visit", 0.0, 20.0, 3.0, 0.5)
+Line 64:     what_matters = st.selectbox("What matters most in choosing a course",
+Line 65:                                 _unique("What matters most to you in choosing a course"))
+Line 66: 
+Line 67: with col3:
+Line 68:     city = st.selectbox("City", _unique("City"))
+Line 69:     occupation = st.selectbox("Current Occupation", _unique("What is your current occupation"))
+Line 70:     do_not_email = st.radio("Do Not Email", ["No", "Yes"], horizontal=True)
+Line 71:     do_not_call = st.radio("Do Not Call", ["No", "Yes"], horizontal=True)
+Line 72:     free_copy = st.radio("Free copy of Mastering The Interview", ["No", "Yes"], horizontal=True)
+  -> Lines 50-72: Renders a 3-column input form with selectboxes, sliders, number inputs, and radio buttons for lead attributes.
+
+Line 73: 
+Line 74: # ── Predict ───────────────────────────────────────────────────────────────────
+Line 75: if st.button("🔮 Predict", type="primary", use_container_width=True):
+  -> Renders primary action button "Predict".
+
+Line 76:     input_dict = {
+Line 77:         "Lead Origin": lead_origin,
+Line 78:         "Lead Source": lead_source,
+Line 79:         "Do Not Email": do_not_email,
+Line 80:         "Do Not Call": do_not_call,
+Line 81:         "TotalVisits": float(total_visits),
+Line 82:         "Total Time Spent on Website": float(time_spent),
+Line 83:         "Page Views Per Visit": float(page_views),
+Line 84:         "Last Activity": last_activity,
+Line 85:         "Specialization": specialization,
+Line 86:         "What matters most to you in choosing a course": what_matters,
+Line 87:         "City": city,
+Line 88:         "A free copy of Mastering The Interview": free_copy,
+Line 89:         "What is your current occupation": occupation,
+Line 90:     }
+  -> Lines 76-90: Constructs `input_dict` mapping user input values to raw dataset feature names.
+
+Line 91: 
+Line 92:     try:
+Line 93:         input_df = pd.DataFrame([input_dict])
+Line 94:         with st.spinner("Running prediction..."):
+Line 95:             prediction, probability = predict_single(input_df, preprocessor, model)
+  -> Lines 92-95: Converts input dict to single-row DataFrame and calls `predict_single()` to run inference.
+
+Line 96: 
+Line 97:         scoring = score_lead(probability)
+Line 98:         lead_score = scoring["lead_score"]
+Line 99:         priority = scoring["priority"]
+Line 100:         recommendation = scoring["recommendation"]
+Line 101:         band_color = scoring["band_color"]
+  -> Lines 97-101: Passes probability to `score_lead()` to obtain lead score (0-100), priority band, sales recommendation, and hex color.
+
+Line 102: 
+Line 103:         st.markdown("---")
+Line 104:         st.markdown("## 📊 Results")
+  -> Renders results section header.
+
+Line 105: 
+Line 106:         # ── Result cards ──────────────────────────────────────────────────────
+Line 107:         c1, c2, c3 = st.columns(3)
+Line 108:         with c1:
+Line 109:             result_color = "#10b981" if prediction == 1 else "#ef4444"
+Line 110:             result_text = "✅ WILL CONVERT" if prediction == 1 else "❌ WON'T CONVERT"
+Line 111:             st.markdown(f"""
+Line 112:             <div class="kpi-card" style="border-top:3px solid {result_color};">
+Line 113:               <div class="kpi-label">Prediction</div>
+Line 114:               <div class="kpi-value" style="color:{result_color}">{result_text}</div>
+Line 115:             </div>""", unsafe_allow_html=True)
+  -> Lines 108-115: Renders Prediction status card (Will Convert in green or Won't Convert in red).
+
+Line 116: 
+Line 117:         with c2:
+Line 118:             st.markdown(f"""
+Line 119:             <div class="kpi-card" style="border-top:3px solid {band_color};">
+Line 120:               <div class="kpi-label">Lead Score</div>
+Line 121:               <div class="kpi-value">{lead_score}</div>
+Line 122:               <div style="color:{band_color};font-weight:700;margin-top:0.25rem;">{priority}</div>
+Line 123:             </div>""", unsafe_allow_html=True)
+  -> Lines 117-123: Renders Lead Score card showing integer score (0-100) and priority band name.
+
+Line 124: 
+Line 125:         with c3:
+Line 126:             st.markdown(f"""
+Line 127:             <div class="kpi-card" style="border-top:3px solid {band_color};">
+Line 128:               <div class="kpi-label">Recommended Action</div>
+Line 129:               <div style="font-size:1.1rem;color:{band_color};font-weight:600;margin-top:0.5rem;">
+Line 130:                 {recommendation}
+Line 131:               </div>
+Line 132:             </div>""", unsafe_allow_html=True)
+  -> Lines 125-132: Renders Recommended Sales Action card.
+
+Line 133: 
+Line 134:         # ── Probability bar + gauge ───────────────────────────────────────────
+Line 135:         st.markdown(f"**Conversion Probability:** {probability:.1%}")
+Line 136:         st.progress(probability)
+  -> Lines 135-136: Displays conversion probability percentage and visual progress bar.
+
+Line 137: 
+Line 138:         c1, c2 = st.columns(2)
+Line 139:         with c1:
+Line 140:             st.plotly_chart(plot_gauge(lead_score), use_container_width=True)
+Line 141:         with c2:
+Line 142:             st.markdown("### 🏷️ Priority Summary")
+Line 143:             for band, (lo, hi) in config.SCORE_BANDS.items():
+Line 144:                 color = config.BAND_COLORS[band]
+Line 145:                 active = band == priority
+Line 146:                 marker = "-> " if active else "  "
+Line 147:                 w = "800" if active else "400"
+Line 148:                 bg = "rgba(255,255,255,0.06)" if active else "transparent"
+Line 149:                 bl = f"3px solid {color}" if active else "3px solid transparent"
+Line 150:                 st.markdown(
+Line 151:                     f'<div style="padding:0.4rem 0.75rem;margin:0.2rem 0;border-radius:8px;'
+Line 152:                     f'background:{bg};border-left:{bl};">'
+Line 153:                     f'<span style="color:{color};font-weight:{w};">{marker}{band}</span>'
+Line 154:                     f'<span style="color:#64748b;font-size:0.8rem;float:right;">{lo}–{hi}</span></div>',
+Line 155:                     unsafe_allow_html=True,
+Line 156:                 )
+  -> Lines 138-156: Renders Plotly gauge chart on left and active priority band summary list on right.
+
+Line 157: 
+Line 158:         # ── Save to DB ────────────────────────────────────────────────────────
+Line 159:         save_prediction(input_dict, prediction, probability, lead_score, priority, recommendation)
+Line 160:         st.caption("✅ Prediction saved to history.")
+  -> Lines 158-160: Automatically persists prediction inputs and outputs into SQLite database.
+
+Line 161: 
+Line 162:     except Exception as e:
+Line 163:         st.error(f"Prediction error: {e}")
+Line 164:         import traceback
+Line 165:         with st.expander("Details"):
+Line 166:             st.code(traceback.format_exc())
+  -> Lines 162-166: Error handling block showing error message and expandable traceback.
+
+Line 167: 
+  -> Blank ending line.
+
+
+--------------------------------------------------------------------------------
+FILE 14: pages/4_🗂️_Prediction_History.py
+--------------------------------------------------------------------------------
+Line 1: """
+Line 2: pages/4_🗂️_Prediction_History.py — Table of past predictions with filters and stats.
+Line 3: """
+  -> Lines 1-3: Module docstring for Prediction History page.
+
+Line 4: import os, sys, json
+Line 5: import streamlit as st
+Line 6: import pandas as pd
+  -> Lines 4-6: Imports OS, sys, json, Streamlit, pandas.
+
+Line 7: 
+Line 8: sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+Line 9: import config
+Line 10: from utils.database import get_history, get_stats, clear_history
+Line 11: from utils.visualization import plot_score_distribution, plot_priority_pie
+  -> Lines 8-11: Imports config, database utils, and visualization functions.
+
+Line 12: 
+Line 13: st.set_page_config(page_title="History | LeadScore AI", page_icon="🗂️", layout="wide")
+Line 14: st.markdown('<h1 class="gradient-text">🗂️ Prediction History</h1>', unsafe_allow_html=True)
+  -> Lines 13-14: Configures page layout and gradient title.
+
+Line 15: 
+Line 16: history = get_history(limit=1000)
+  -> Queries SQLite database for the 1,000 most recent predictions.
+
+Line 17: 
+Line 18: if history.empty:
+Line 19:     st.info("No predictions yet. Use **🎯 Predict Lead** to start scoring leads.")
+Line 20:     st.stop()
+  -> Lines 18-20: If database history is empty, renders info banner and stops page execution.
+
+Line 21: 
+Line 22: # ── Stats row ─────────────────────────────────────────────────────────────────
+Line 23: stats = get_stats()
+Line 24: c1, c2, c3, c4 = st.columns(4)
+Line 25: c1.metric("Total Predictions", stats["total"])
+Line 26: c2.metric("Avg Lead Score", stats["avg_score"])
+Line 27: c3.metric("Predicted Converts", stats["converts"])
+Line 28: c4.metric("Predicted Conv Rate", f"{stats['conversion_rate']}%")
+  -> Lines 23-28: Renders top KPI cards summarizing database metrics.
+
+Line 29: 
+Line 30: st.markdown("---")
+  -> Divider line.
+
+Line 31: 
+Line 32: # ── Filters ───────────────────────────────────────────────────────────────────
+Line 33: col1, col2 = st.columns(2)
+Line 34: with col1:
+Line 35:     band_filter = st.multiselect(
+Line 36:         "Filter by Priority Band", options=history["priority"].unique().tolist(),
+Line 37:         default=history["priority"].unique().tolist(),
+Line 38:     )
+Line 39: with col2:
+Line 40:     pred_filter = st.multiselect(
+Line 41:         "Filter by Prediction", options=["Convert", "Won't Convert"],
+Line 42:         default=["Convert", "Won't Convert"],
+Line 43:     )
+  -> Lines 33-43: Renders multiselect filters for priority bands and prediction outcomes.
+
+Line 44: 
+Line 45: pred_map = {"Convert": 1, "Won't Convert": 0}
+Line 46: pred_vals = [pred_map[p] for p in pred_filter]
+Line 47: filtered = history[
+Line 48:     history["priority"].isin(band_filter) & history["prediction"].isin(pred_vals)
+Line 49: ]
+  -> Lines 45-49: Filters the history DataFrame based on selected priority bands and binary prediction values.
+
+Line 50: 
+Line 51: st.markdown(f"**Showing {len(filtered)} of {len(history)} records**")
+  -> Displays current filtered record count vs total history records.
+
+Line 52: 
+Line 53: # ── Data table ────────────────────────────────────────────────────────────────
+Line 54: display_cols = ["id", "timestamp", "prediction", "probability", "lead_score", "priority", "recommendation"]
+Line 55: available = [c for c in display_cols if c in filtered.columns]
+Line 56: st.dataframe(
+Line 57:     filtered[available].style.format({
+Line 58:         "probability": "{:.1%}",
+Line 59:     }),
+Line 60:     use_container_width=True, hide_index=True, height=400,
+Line 61: )
+  -> Lines 54-61: Renders interactive pandas data table of filtered predictions with formatted probabilities.
+
+Line 62: 
+Line 63: # ── Charts ────────────────────────────────────────────────────────────────────
+Line 64: st.markdown("---")
+Line 65: col1, col2 = st.columns(2)
+Line 66: with col1:
+Line 67:     if "lead_score" in filtered.columns:
+Line 68:         st.plotly_chart(plot_score_distribution(filtered["lead_score"]), use_container_width=True)
+Line 69: with col2:
+Line 70:     if "priority" in filtered.columns:
+Line 71:         st.plotly_chart(plot_priority_pie(filtered["priority"]), use_container_width=True)
+  -> Lines 64-71: Renders score distribution histogram and priority donut pie chart for filtered history subset.
+
+Line 72: 
+Line 73: # ── Clear history ─────────────────────────────────────────────────────────────
+Line 74: st.markdown("---")
+Line 75: with st.expander("⚠️ Danger Zone"):
+Line 76:     if st.button("🗑️ Clear All History", type="secondary"):
+Line 77:         deleted = clear_history()
+Line 78:         st.success(f"Deleted {deleted} records. Refresh the page.")
+Line 79:         st.rerun()
+  -> Lines 74-79: Renders Danger Zone expander button allowing user to wipe SQLite predictions history and reload page.
+
+Line 80: 
+  -> Blank ending line.
+
+
+--------------------------------------------------------------------------------
+FILE 15: requirements.txt
+--------------------------------------------------------------------------------
+Line 1: numpy             -> Fundamental package for numerical array computing.
+Line 2: pandas            -> Data structures and DataFrame analysis library.
+Line 3: scikit-learn      -> Machine learning modeling, preprocessors, metrics, and calibration.
+Line 4: xgboost           -> Extreme Gradient Boosting classifier algorithm.
+Line 5: streamlit         -> Framework for building and running interactive web applications.
+Line 6: plotly            -> Interactive graphing library for rendering gauge, pie, and bar charts.
+Line 7: joblib            -> Fast object serialization for saving/loading model binary .pkl files.
+Line 8: python-dateutil   -> Extensions to standard Python datetime for date parsing.
+
+
+--------------------------------------------------------------------------------
+FILE 16: .gitignore
+--------------------------------------------------------------------------------
+Lines 1-45: Specifies patterns for files and directories that Git must ignore:
+  - Python byte code (__pycache__/, *.pyc)
+  - Virtual environment folders (.venv/, venv/)
+  - Test cache directories (.pytest_cache/)
+  - SQLite database files (database/*.db)
+  - Operating system system files (.DS_Store, Thumbs.db)
+  - Log files (*.log)
+
+
+--------------------------------------------------------------------------------
+FILE 17: .streamlit/config.toml
+--------------------------------------------------------------------------------
+Line 1: [theme]
+Line 2: primaryColor = "#6366f1"          -> Indigo primary accent color for Streamlit widgets.
+Line 3: backgroundColor = "#0e1117"       -> Dark background color for main canvas area.
+Line 4: secondaryBackgroundColor = "#1a1a2e" -> Dark background color for sidebar and cards.
+Line 5: textColor = "#f1f5f9"             -> High contrast light text color.
+Line 6: font = "sans serif"               -> Sans-serif typography choice.
+Line 7: 
+Line 8: [server]
+Line 9: headless = true                   -> Runs Streamlit in headless server mode (no web browser auto-pop).
+Line 10: port = 8501                      -> Default web server network port.
+Line 11: 
+Line 12: [browser]
+Line 13: gatherUsageStats = false         -> Disables sending anonymous usage telemetry to Streamlit.
+
+================================================================================
+END OF LINE-BY-LINE EXPLANATION DOCUMENTATION
+================================================================================

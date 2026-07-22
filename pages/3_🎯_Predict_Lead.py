@@ -16,7 +16,7 @@ from utils.visualization import plot_gauge
 st.set_page_config(page_title="Predict Lead | LeadScore AI", page_icon="🎯", layout="wide")
 st.markdown('<h1 class="gradient-text">🎯 Predict Lead</h1>', unsafe_allow_html=True)
 
-# ── Check model exists ────────────────────────────────────────────────────────
+# ── Check model exists 
 if not os.path.exists(config.MODEL_PATH):
     st.error("No trained model found. Run `python pipeline/train.py` first.")
     st.stop()
@@ -29,25 +29,26 @@ def _load_artifacts():
 
 model, preprocessor = _load_artifacts()
 
-# ── Load dataset for dropdown values ──────────────────────────────────────────
-
+# ── Load dataset for dropdown values 
 @st.cache_data
 def _load_raw():
     df = pd.read_csv(config.DATA_PATH)
     df.replace("Select", np.nan, inplace=True)
-    return df
+    return df   
+
 
 raw = _load_raw()
 
-def _unique(col):
+def _unique(col): 
     """Return sorted unique non-null values for a column."""
+    # create dropdown values
     if col in raw.columns:
         vals = raw[col].dropna().unique().tolist()
         return sorted([str(v) for v in vals])
     return []
 
 
-# ── Input form ────────────────────────────────────────────────────────────────
+# ── Input form 
 st.markdown("Fill in the lead attributes below.")
 
 col1, col2, col3 = st.columns(3)
@@ -71,7 +72,7 @@ with col3:
     do_not_call = st.radio("Do Not Call", ["No", "Yes"], horizontal=True)
     free_copy = st.radio("Free copy of Mastering The Interview", ["No", "Yes"], horizontal=True)
 
-# ── Predict ───────────────────────────────────────────────────────────────────
+# ── Predict 
 if st.button("🔮 Predict", type="primary", use_container_width=True):
     input_dict = {
         "Lead Origin": lead_origin,
@@ -103,7 +104,7 @@ if st.button("🔮 Predict", type="primary", use_container_width=True):
         st.markdown("---")
         st.markdown("## 📊 Results")
 
-        # ── Result cards ──────────────────────────────────────────────────────
+        # ── Result cards 
         c1, c2, c3 = st.columns(3)
         with c1:
             result_color = "#10b981" if prediction == 1 else "#ef4444"
@@ -155,7 +156,7 @@ if st.button("🔮 Predict", type="primary", use_container_width=True):
                     unsafe_allow_html=True,
                 )
 
-        # ── Save to DB ────────────────────────────────────────────────────────
+        # ── Save to DB 
         save_prediction(input_dict, prediction, probability, lead_score, priority, recommendation)
         st.caption("✅ Prediction saved to history.")
 

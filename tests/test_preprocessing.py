@@ -15,7 +15,7 @@ from utils.preprocessing import (
 import config
 
 
-# ── Fixtures ──────────────────────────────────────────────────────────────────
+# ── Fixtures 
 @pytest.fixture
 def sample_df():
     return pd.DataFrame({
@@ -27,7 +27,7 @@ def sample_df():
     })
 
 
-# ── SelectReplacer ────────────────────────────────────────────────────────────
+# ── SelectReplacer 
 def test_select_replacer_converts_select_to_nan():
     df = pd.DataFrame({"a": ["Select", "Google", "Select"]})
     result = SelectReplacer().fit_transform(df)
@@ -47,7 +47,7 @@ def test_select_replacer_handles_mixed_types():
     assert result["a"].iloc[0] is np.nan or pd.isna(result["a"].iloc[0])
 
 
-# ── IQRCapper ─────────────────────────────────────────────────────────────────
+# ── IQRCapper 
 def test_iqr_capper_clips_outliers():
     df = pd.DataFrame({"TotalVisits": [1, 2, 3, 4, 5, 1000]})
     capper = IQRCapper(columns=["TotalVisits"])
@@ -81,7 +81,7 @@ def test_iqr_capper_ignores_missing_columns():
     assert "other_col" in result.columns
 
 
-# ── FrequencyEncoder ──────────────────────────────────────────────────────────
+# ── FrequencyEncoder 
 def test_frequency_encoder_maps_frequencies():
     df = pd.DataFrame({"city": ["Mumbai", "Mumbai", "Delhi", "Mumbai", "Delhi"]})
     enc = FrequencyEncoder(columns=["city"])
@@ -101,7 +101,7 @@ def test_frequency_encoder_unknown_gets_zero():
     assert result["city"].iloc[0] == 0.0
 
 
-# ── drop_high_missing ─────────────────────────────────────────────────────────
+# ── drop_high_missing 
 def test_drop_high_missing_respects_threshold():
     df = pd.DataFrame({
         "good_col":  [1, 2, 3, 4, 5],
@@ -121,7 +121,7 @@ def test_drop_high_missing_keeps_all_when_none_exceed():
     assert result.shape[1] == 2
 
 
-# ── Full pipeline smoke test ──────────────────────────────────────────────────
+# ── Full pipeline smoke test 
 def test_pipeline_fit_transform_shape():
     numeric_cols = ["visits", "score"]
     low_card     = ["source"]
