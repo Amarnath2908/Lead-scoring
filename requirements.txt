@@ -1,3 +1,5 @@
+# LeadScore AI – Streamlit Cloud requirements
+# Pin scikit-learn to 1.4.2 to match saved model artifacts
 numpy==1.26.4
 pandas==2.2.2
 scikit-learn==1.4.2
